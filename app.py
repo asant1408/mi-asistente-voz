@@ -2,60 +2,54 @@
 import streamlit as st
 from transformers import pipeline
 import tempfile
-import os
 
-# Configuración de la página
-st.set_page_config(page_title="Mi Asistente de Voz", layout="centered")
-st.title("🎙️ Mi Asistente Multilingüe")
-st.write("Sube un audio corto (WAV o MP3) y te responderé en el mismo idioma.")
+st.set_page_config(page_title="Asistente Ligero", layout="centered")
+st.title("🎙️ Asistente Multilingüe (Versión Ligera)")
+st.write("Escribe una pregunta en español o inglés y obtén una respuesta.")
 
-# Cargar modelo de IA (ligero y multilingüe)
+# Cargar modelo SIN torch (usa accelerate + CPU)
 @st.cache_resource
 def cargar_ia():
-    return pipeline("text2text-generation", model="google/flan-t5-small", max_length=80)
+    # Este modelo es pequeño y funciona con accelerate
+    return pipeline(
+        "text2text-generation",
+        model="google/flan-t5-small",
+        device=-1  # fuerza CPU
+    )
 
-ia = cargar_ia()
+try:
+    ia = cargar_ia()
+except Exception as e:
+    st.error(f"Error al cargar el modelo: {str(e)}")
+    st.stop()
 
-# Subida de audio
-audio_file = st.file_uploader("🗣️ Sube tu audio", type=["wav", "mp3"])
+# Entrada de texto (más estable que audio en esta versión)
+pregunta = st.text_input("💬 Escribe tu pregunta:", "Hola, ¿cómo estás?")
 
-if audio_file is not None:
-    # Guardar temporalmente
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(audio_file.getvalue())
-        audio_path = tmp.name
-
-    # Aquí iría Whisper... pero para simplificar el despliegue,
-    # por ahora simulamos con entrada de texto.
-    # (Más abajo te explico cómo añadir Whisper después)
+if pregunta:
+    # Detección básica de idioma
+    if any(palabra in pregunta.lower() for palabra in ["hola", "gracias", "buenos", "mañana"]):
+        prompt = f"Responde amablemente en español: {pregunta}"
+        lang = "es"
+    elif any(palabra in pregunta.lower() for palabra in ["hello", "thank", "good", "weather"]):
+        prompt = f"Respond kindly in English: {pregunta}"
+        lang = "en"
+    else:
+        prompt = f"Answer briefly: {pregunta}"
+        lang = "en"
     
-    st.info("⚠️ Nota: Esta versión usa entrada de texto para evitar errores de despliegue.")
-    texto_usuario = st.text_input("O escribe lo que dirías:", "Hola, ¿cómo estás?")
-    
-    if texto_usuario:
-        # Detectar idioma básico (simplificado)
-        if any(palabra in texto_usuario.lower() for palabra in ["hola", "gracias", "buenos"]):
-            lang = "es"
-            prompt = f"Responde amablemente en español: {texto_usuario}"
-        elif any(palabra in texto_usuario.lower() for palabra in ["hello", "thank you", "good"]):
-            lang = "en"
-            prompt = f"Respond kindly in English: {texto_usuario}"
-        else:
-            lang = "en"
-            prompt = f"Respond: {texto_usuario}"
-        
-        # Generar respuesta
-        respuesta = ia(prompt)[0]['generated_text']
-        
-        st.subheader(f"🤖 IA ({lang}):")
-        st.write(respuesta)
-        
-        # Convertir a voz
+    with st.spinner("🧠 Pensando..."):
         try:
+            respuesta = ia(prompt, max_length=80, do_sample=True)[0]['generated_text']
+            st.subheader(f"🤖 IA ({lang}):")
+            st.write(respuesta)
+            
+            # Convertir a voz
             from gtts import gTTS
             tts = gTTS(text=respuesta, lang=lang)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
-                tts.save(tmp_audio.name)
-                st.audio(tmp_audio.name, format="audio/mp3")
-        except:
-            st.warning("🔊 Audio no disponible en esta plataforma, pero la respuesta está arriba.")
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                tts.save(tmp.name)
+                st.audio(tmp.name, format="audio/mp3")
+        except Exception as e:
+            st.error(f"Lo siento, hubo un error: {str(e)}")
+            st.write("Intenta con una pregunta más simple.")
