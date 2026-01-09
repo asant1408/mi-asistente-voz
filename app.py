@@ -1,55 +1,31 @@
 # app.py
 import streamlit as st
-from transformers import pipeline
+from gtts import gTTS
 import tempfile
 
-st.set_page_config(page_title="Asistente Ligero", layout="centered")
-st.title("🎙️ Asistente Multilingüe (Versión Ligera)")
-st.write("Escribe una pregunta en español o inglés y obtén una respuesta.")
+st.set_page_config(page_title="Asistente Simple", layout="centered")
+st.title("🎙️ Asistente de Voz Básico")
+st.write("Escribe algo en español o inglés y escucha la respuesta.")
 
-# Cargar modelo SIN torch (usa accelerate + CPU)
-@st.cache_resource
-def cargar_ia():
-    # Este modelo es pequeño y funciona con accelerate
-    return pipeline(
-        "text2text-generation",
-        model="google/flan-t5-small",
-        device=-1  # fuerza CPU
-    )
-
-try:
-    ia = cargar_ia()
-except Exception as e:
-    st.error(f"Error al cargar el modelo: {str(e)}")
-    st.stop()
-
-# Entrada de texto (más estable que audio en esta versión)
-pregunta = st.text_input("💬 Escribe tu pregunta:", "Hola, ¿cómo estás?")
+pregunta = st.text_input("💬 Tu mensaje:", "Hola")
 
 if pregunta:
-    # Detección básica de idioma
-    if any(palabra in pregunta.lower() for palabra in ["hola", "gracias", "buenos", "mañana"]):
-        prompt = f"Responde amablemente en español: {pregunta}"
+    # Respuesta simple según idioma detectado
+    if any(palabra in pregunta.lower() for palabra in ["hola", "gracias", "buenos", "adiós"]):
+        respuesta = "¡Hola! ¿En qué puedo ayudarte hoy?"
         lang = "es"
-    elif any(palabra in pregunta.lower() for palabra in ["hello", "thank", "good", "weather"]):
-        prompt = f"Respond kindly in English: {pregunta}"
+    elif any(palabra in pregunta.lower() for palabra in ["hello", "thank", "goodbye", "help"]):
+        respuesta = "Hello! How can I help you today?"
         lang = "en"
     else:
-        prompt = f"Answer briefly: {pregunta}"
+        respuesta = "I received your message!"
         lang = "en"
-    
-    with st.spinner("🧠 Pensando..."):
-        try:
-            respuesta = ia(prompt, max_length=80, do_sample=True)[0]['generated_text']
-            st.subheader(f"🤖 IA ({lang}):")
-            st.write(respuesta)
-            
-            # Convertir a voz
-            from gtts import gTTS
-            tts = gTTS(text=respuesta, lang=lang)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
-                tts.save(tmp.name)
-                st.audio(tmp.name, format="audio/mp3")
-        except Exception as e:
-            st.error(f"Lo siento, hubo un error: {str(e)}")
-            st.write("Intenta con una pregunta más simple.")
+
+    st.subheader(f"🤖 Respuesta ({lang}):")
+    st.write(respuesta)
+
+    # Convertir a voz
+    tts = gTTS(text=respuesta, lang=lang)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+        tts.save(tmp.name)
+        st.audio(tmp.name, format="audio/mp3")
