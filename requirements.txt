@@ -1,6 +1,9 @@
 streamlit==1.39.0
 transformers==4.44.0
-torch==2.4.0
 sentencepiece
 protobuf<5.0.0
 gtts
+numpy<2.0.0
+# Instalar torch desde la fuente oficial precompilada
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.4.0+cpu
